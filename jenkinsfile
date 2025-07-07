@@ -1,0 +1,162 @@
+First install plugins - Nexus and Ansible, sonar, maven, deploy to container, S3 Publisher
+---------------------
+
+Jenkins --> Manage Jenkins --> plugins --> nexus artifact upload, SonarQube Scanner, Maven Integration, deploy to container and ansible --> install --> restart jenkins
+
+Manage Jenkins --> tools --> Add ansible --> Name=ansible, path = /bin
+
+pipeline code till artifacts and run the pipeline --> it will generate war file
+
+pipeline {
+    agent any
+   
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('artifact') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+    }
+}
+
+**Build now***
+
+Integrate with Sonar
+-------------------
+
+pipeline {
+    agent any
+   
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar'
+                }
+            }
+        }
+
+        stage('artifact') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+    }
+}
+
+
+**Build now***
+
+Integrate with Nexus
+--------------------
+pipeline {
+    agent any
+   
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('artifact') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar'
+                }
+            }
+        }
+        stage('nexus') {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'myapp', classifier: '', file: 'target/myapp.war', type: '.war']], credentialsId: 'nexuscreds', groupId: 'in.reyaz', nexusUrl: '13.233.124.23:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'hotstarapp', version: '8.3.3-SNAPSHOT'
+            }
+        }
+    }
+}
+
+S3 Integration
+=============
+
+pipeline {
+    agent any
+   
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git&#39;
+            }
+        }
+        stage('build') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar'
+                }
+            }
+        }
+
+        stage('artifact') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage('Upload to S3') {
+            steps {
+                s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'jenkins-artifacts-demo-test', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'ap-south-1', showDirectlyInBrowser: false, sourceFile: '**/*.war', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: true]], pluginFailureResultConstraint: 'FAILURE', profileName: 's3creds', userMetadata: []
+            }
+        }
+    }
+}
